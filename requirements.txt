@@ -1,5 +1,8 @@
 streamlit
 requests
 gTTS
-ffmpeg-python
 pyngrok
+whisper
+sieve
+ffmpeg-python
+
