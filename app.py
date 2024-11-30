@@ -5,6 +5,7 @@ import os
 import subprocess
 from gtts import gTTS
 import sieve
+import whisper
 
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
@@ -18,9 +19,6 @@ if uploaded_video is not None:
         temp_video.write(uploaded_video.read())
         video_path = temp_video.name
 
-    # Debugging: Check if video was saved
-    st.write("Video saved at:", video_path)
-
     # Display success and video
     st.success("Video uploaded successfully!")
     st.video(uploaded_video)
@@ -32,17 +30,15 @@ if uploaded_video is not None:
     if st.button("Extract and Transcribe Audio"):
         with st.spinner('Processing audio...'):
             try:
+                # Check if ffmpeg is available
+                ffmpeg_check = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if ffmpeg_check.returncode != 0:
+                    raise FileNotFoundError("FFmpeg is not installed or not found in PATH.")
+
                 # Extract audio using FFmpeg
                 subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
 
-                # Debugging: Check if audio was extracted
-                if os.path.exists(audio_path):
-                    st.write("Audio extracted successfully:", audio_path)
-                else:
-                    st.error("Audio extraction failed.")
-
                 # Transcribe audio using Whisper
-                import whisper
                 model = whisper.load_model("base")
                 result = model.transcribe(audio_path)
 
@@ -51,12 +47,13 @@ if uploaded_video is not None:
                 with open(transcription_file_path, "w") as file:
                     file.write(transcription)
 
-                # Debugging: Check if transcription is generated
-                st.write("Transcription generated:", transcription)
-
                 st.success("Audio extracted and transcribed successfully!")
                 st.text_area("Edit the Transcript Here", transcription, key="unique_edit_transcript")
 
+            except FileNotFoundError as e:
+                st.error(f"Dependency error: {e}")
+            except subprocess.CalledProcessError as e:
+                st.error(f"FFmpeg error: {e.stderr.decode('utf-8')}")
             except Exception as e:
                 st.error(f"Error during audio extraction or transcription: {e}")
 
@@ -65,13 +62,7 @@ if uploaded_video is not None:
         with open(transcription_file_path, "r") as file:
             transcription = file.read().strip()
 
-        # Debugging: Check if transcription file was read
-        st.write("Loaded transcription from file:", transcription)
-
         edited_transcript = st.text_area("Edit the Transcript Here", transcription, key="unique_edit_transcript")
-
-        # Debugging: Check if text area is showing the correct text
-        st.write("Current edited transcript:", edited_transcript)
 
         if st.button("Generate Edited Audio"):
             with st.spinner('Generating new audio...'):
@@ -81,23 +72,12 @@ if uploaded_video is not None:
                     raw_audio_path = "raw_edited_audio.mp3"
                     tts.save(raw_audio_path)
 
-                    # Debugging: Check if raw MP3 audio file was created
-                    if os.path.exists(raw_audio_path):
-                        st.write("Raw edited audio file created:", raw_audio_path)
-                    else:
-                        st.error("Raw audio generation failed.")
-
                     # Convert to WAV format
                     edited_audio_path = "edited_audio.wav"
                     subprocess.run(['ffmpeg', '-y', '-i', raw_audio_path, '-ar', '16000', '-ac', '1', edited_audio_path], check=True)
 
-                    # Debugging: Check if edited WAV audio file was created
-                    if os.path.exists(edited_audio_path):
-                        st.write("Edited WAV audio file created:", edited_audio_path)
-                        st.success("Edited audio generated successfully!")
-                        st.audio(edited_audio_path)
-                    else:
-                        st.error("Audio conversion to WAV failed.")
+                    st.success("Edited audio generated successfully!")
+                    st.audio(edited_audio_path)
 
                 except Exception as e:
                     st.error(f"Failed to generate or convert audio: {e}")
@@ -113,16 +93,10 @@ if uploaded_video is not None:
                     audio_file = sieve.File(path="edited_audio.wav")
                     lipsync = sieve.function.get("sieve/lipsync")
 
-                    # Debugging: Show API input details
-                    st.write("Sending to Sieve API:", video_file.path, audio_file.path)
-
                     output = lipsync.run(
                         video_file, audio_file, enhance="default", backend="sievesync",
                         downsample=False, cut_by="audio"
                     )
-
-                    # Debugging: Check Sieve API response
-                    st.write("Sieve API response:", output)
 
                     if "path" in output:
                         st.success("Lip-synced video generated successfully!")
