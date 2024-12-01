@@ -48,7 +48,7 @@ if uploaded_video is not None:
                     file.write(transcription)
 
                 st.success("Audio extracted and transcribed successfully!")
-                st.text_area("Edit the Transcript Here", transcription, key="unique_edit_transcript")
+                st.session_state["transcription"] = transcription
 
             except FileNotFoundError as e:
                 st.error(f"Dependency error: {e}")
@@ -58,10 +58,8 @@ if uploaded_video is not None:
                 st.error(f"Error during audio extraction or transcription: {e}")
 
     # Step 3: Edit Transcript and Generate Edited Audio
-    if os.path.exists(transcription_file_path):
-        with open(transcription_file_path, "r") as file:
-            transcription = file.read().strip()
-
+    if "transcription" in st.session_state:
+        transcription = st.session_state["transcription"]
         edited_transcript = st.text_area("Edit the Transcript Here", transcription, key="unique_edit_transcript")
 
         if st.button("Generate Edited Audio"):

@@ -2,7 +2,8 @@ streamlit
 requests
 gTTS
 pyngrok
-whisper
+git+https://github.com/openai/whisper.git
 sieve
 ffmpeg-python
+
 
