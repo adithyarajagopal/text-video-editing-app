@@ -3,11 +3,9 @@ import requests
 import tempfile
 import os
 import subprocess
-import shutil
 import base64
-import sieve
 from gtts import gTTS
-import whisper  # Ensure the whisper library is installed
+import whisper
 
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
@@ -34,10 +32,6 @@ if uploaded_video is not None:
         with st.spinner('Processing audio...'):
             try:
                 # Extract audio using FFmpeg
-                if not os.path.exists(video_path):
-                    st.error("Video file not found.")
-                    raise FileNotFoundError("Video file missing.")
-
                 subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
 
                 # Convert extracted audio to desired format
@@ -55,8 +49,6 @@ if uploaded_video is not None:
                 st.success("Audio extracted, processed, and transcribed successfully!")
                 st.session_state["transcription"] = transcription
 
-            except FileNotFoundError as fnf_error:
-                st.error(f"File error: {fnf_error}")
             except Exception as e:
                 st.error(f"Error during audio processing or transcription: {e}")
 
@@ -80,8 +72,6 @@ if uploaded_video is not None:
                     st.success("Edited audio generated successfully!")
                     st.audio(edited_audio_path)
 
-                except FileNotFoundError as fnf_error:
-                    st.error(f"File error: {fnf_error}")
                 except Exception as e:
                     st.error(f"Failed to generate or convert audio: {e}")
 
@@ -90,26 +80,35 @@ if uploaded_video is not None:
         if st.button("Generate Lip-Synced Video"):
             with st.spinner('Generating lip-synced video...'):
                 try:
-                    sieve.api_key = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"
+                    # Encode video and audio as base64
+                    with open(video_path, "rb") as video:
+                        video_content = base64.b64encode(video.read()).decode()
 
-                    # Upload video and audio to Sieve
-                    video_file = sieve.File(path=video_path)
-                    audio_file = sieve.File(path="edited_audio.wav")
+                    with open("edited_audio.wav", "rb") as audio:
+                        audio_content = base64.b64encode(audio.read()).decode()
 
-                    # Configure and run lip-sync function
-                    lipsync = sieve.function.get("sieve/lipsync")
-                    output = lipsync.run(video_file, audio_file, "default", "sievesync", False, "audio")
+                    # Prepare headers and payload
+                    headers = {
+                        "Authorization": "Bearer cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "video": {"filename": os.path.basename(video_path), "content": video_content},
+                        "audio": {"filename": "edited_audio.wav", "content": audio_content}
+                    }
 
-                    # Verify output and display the result
-                    output_path = output.get("path")
-                    if output_path:
-                        shutil.copy(output_path, "lip_synced_output.mp4")
-                        st.success("Lip-synced video generated successfully!")
-                        st.video("lip_synced_output.mp4")
+                    # Make the API call
+                    response = requests.post("https://mango.sievedata.com/lipsync", headers=headers, json=payload)
+
+                    if response.status_code == 200:
+                        output_url = response.json().get("output_url")
+                        if output_url:
+                            st.success("Lip-synced video generated successfully!")
+                            st.video(output_url)
+                        else:
+                            st.error("Lip-sync processing failed: No output URL provided.")
                     else:
-                        st.error("Lip-sync processing failed. No output file.")
+                        st.error(f"Failed to generate lip-synced video: {response.text}")
 
-                except requests.exceptions.RequestException as req_error:
-                    st.error(f"API request error: {req_error}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
