@@ -4,7 +4,6 @@ import tempfile
 import os
 import subprocess
 from gtts import gTTS
-import sieve
 import whisper
 
 # Step 1: Title and Video Upload
@@ -85,22 +84,45 @@ if uploaded_video is not None:
         if st.button("Generate Lip-Synced Video"):
             with st.spinner('Generating lip-synced video...'):
                 try:
-                    # Authenticate and call Sieve API
-                    sieve.api_key = "YOUR_SIEVE_API_KEY"  # Replace with your Sieve API key
-                    video_file = sieve.File(path=video_path)
-                    audio_file = sieve.File(path="edited_audio.wav")
-                    lipsync = sieve.function.get("sieve/lipsync")
+                    # Replace with your Sieve API key
+                    SIEVE_API_KEY = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"  
+                    headers = {"Authorization": f"Bearer {SIEVE_API_KEY}"}
 
-                    output = lipsync.run(
-                        video_file, audio_file, enhance="default", backend="sievesync",
-                        downsample=False, cut_by="audio"
-                    )
+                    # Upload files to Sieve
+                    with open(video_path, "rb") as v_file:
+                        video_upload = requests.post(
+                            "https://api.sieve.ai/upload",
+                            headers=headers,
+                            files={"file": v_file}
+                        )
+                    
+                    with open("edited_audio.wav", "rb") as a_file:
+                        audio_upload = requests.post(
+                            "https://api.sieve.ai/upload",
+                            headers=headers,
+                            files={"file": a_file}
+                        )
 
-                    if "path" in output:
-                        st.success("Lip-synced video generated successfully!")
-                        st.video(output["path"])
+                    if video_upload.status_code == 200 and audio_upload.status_code == 200:
+                        video_url = video_upload.json()["url"]
+                        audio_url = audio_upload.json()["url"]
+
+                        # Trigger lip-sync processing
+                        response = requests.post(
+                            "https://api.sieve.ai/lipsync",
+                            headers=headers,
+                            json={"video_url": video_url, "audio_url": audio_url}
+                        )
+
+                        if response.status_code == 200:
+                            output_url = response.json()["output_url"]
+                            st.success("Lip-synced video generated successfully!")
+                            st.video(output_url)
+                        else:
+                            st.error(f"Failed to generate lip-synced video: {response.json()}")
+
                     else:
-                        st.error("Failed to generate lip-synced video.")
+                        st.error("Failed to upload files to Sieve API.")
 
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
