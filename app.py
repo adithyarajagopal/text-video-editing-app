@@ -3,9 +3,11 @@ import requests
 import tempfile
 import os
 import subprocess
-import base64
 import shutil
+import base64
 import sieve
+from gtts import gTTS
+import whisper  # Ensure the whisper library is installed
 
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
@@ -32,6 +34,10 @@ if uploaded_video is not None:
         with st.spinner('Processing audio...'):
             try:
                 # Extract audio using FFmpeg
+                if not os.path.exists(video_path):
+                    st.error("Video file not found.")
+                    raise FileNotFoundError("Video file missing.")
+
                 subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
 
                 # Convert extracted audio to desired format
@@ -49,6 +55,8 @@ if uploaded_video is not None:
                 st.success("Audio extracted, processed, and transcribed successfully!")
                 st.session_state["transcription"] = transcription
 
+            except FileNotFoundError as fnf_error:
+                st.error(f"File error: {fnf_error}")
             except Exception as e:
                 st.error(f"Error during audio processing or transcription: {e}")
 
@@ -72,6 +80,8 @@ if uploaded_video is not None:
                     st.success("Edited audio generated successfully!")
                     st.audio(edited_audio_path)
 
+                except FileNotFoundError as fnf_error:
+                    st.error(f"File error: {fnf_error}")
                 except Exception as e:
                     st.error(f"Failed to generate or convert audio: {e}")
 
@@ -99,5 +109,7 @@ if uploaded_video is not None:
                     else:
                         st.error("Lip-sync processing failed. No output file.")
 
+                except requests.exceptions.RequestException as req_error:
+                    st.error(f"API request error: {req_error}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
