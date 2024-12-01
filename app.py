@@ -89,26 +89,26 @@ if uploaded_video is not None:
                         files={"file": open(video_path, "rb")}
                     )
 
+                    if video_upload.status_code != 200:
+                        st.error(f"Video upload failed: {video_upload.text}")
+                        return None
+
                     audio_upload = requests.post(
                         "https://mango.sievedata.com/upload",
                         headers=headers,
                         files={"file": open("edited_audio.wav", "rb")}
                     )
 
-                    # Debugging: Log response status codes and errors
-                    if video_upload.status_code != 200:
-                        st.error(f"Video upload failed: {video_upload.text}")
-                        return
                     if audio_upload.status_code != 200:
                         st.error(f"Audio upload failed: {audio_upload.text}")
-                        return
+                        return None
 
                     video_url = video_upload.json().get("url")
                     audio_url = audio_upload.json().get("url")
 
                     if not video_url or not audio_url:
                         st.error("Failed to retrieve uploaded file URLs.")
-                        return
+                        return None
 
                     # Trigger lip-sync processing
                     response = requests.post(
@@ -131,5 +131,3 @@ if uploaded_video is not None:
                     st.error(f"Network error: {e}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
-
-
