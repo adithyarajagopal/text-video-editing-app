@@ -30,9 +30,7 @@ if uploaded_video is not None:
         with st.spinner('Processing audio...'):
             try:
                 # Check if ffmpeg is available
-                ffmpeg_check = subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if ffmpeg_check.returncode != 0:
-                    raise FileNotFoundError("FFmpeg is not installed or not found in PATH.")
+                subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
                 # Extract audio using FFmpeg
                 subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
@@ -49,10 +47,6 @@ if uploaded_video is not None:
                 st.success("Audio extracted and transcribed successfully!")
                 st.session_state["transcription"] = transcription
 
-            except FileNotFoundError as e:
-                st.error(f"Dependency error: {e}")
-            except subprocess.CalledProcessError as e:
-                st.error(f"FFmpeg error: {e.stderr.decode('utf-8')}")
             except Exception as e:
                 st.error(f"Error during audio extraction or transcription: {e}")
 
@@ -85,47 +79,57 @@ if uploaded_video is not None:
             with st.spinner('Generating lip-synced video...'):
                 try:
                     # Replace with your Sieve API key
-                    SIEVE_API_KEY = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"  
+                    SIEVE_API_KEY = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"
                     headers = {"Authorization": f"Bearer {SIEVE_API_KEY}"}
 
-                    # Upload files to Sieve
-                    with open(video_path, "rb") as v_file:
-                        video_upload = requests.post(
-                            "https://mango.sievedata.com/upload",
-                            headers=headers,
-                            files={"file": v_file}
-                        )
-                    
-                    with open("edited_audio.wav", "rb") as a_file:
-                        audio_upload = requests.post(
-                            "https://mango.sievedata.com/upload",
-                            headers=headers,
-                            files={"file": a_file}
-                        )
+                    # Upload files to Sieve API
+                    video_upload = requests.post(
+                        "https://mango.sievedata.com/upload",
+                        headers=headers,
+                        files={"file": open(video_path, "rb")}
+                    )
 
-                    if video_upload.status_code == 200 and audio_upload.status_code == 200:
-                        video_url = video_upload.json()["url"]
-                        audio_url = audio_upload.json()["url"]
+                    audio_upload = requests.post(
+                        "https://mango.sievedata.com/upload",
+                        headers=headers,
+                        files={"file": open("edited_audio.wav", "rb")}
+                    )
 
-                        # Trigger lip-sync processing
-                        response = requests.post(
-                            "https://mango.sievedata.com/lipsync",
-                            headers=headers,
-                            json={"video_url": video_url, "audio_url": audio_url}
-                        )
+                    # Debugging: Log response status codes and errors
+                    if video_upload.status_code != 200:
+                        st.error(f"Video upload failed: {video_upload.text}")
+                        return
+                    if audio_upload.status_code != 200:
+                        st.error(f"Audio upload failed: {audio_upload.text}")
+                        return
 
-                        if response.status_code == 200:
-                            output_url = response.json()["output_url"]
+                    video_url = video_upload.json().get("url")
+                    audio_url = audio_upload.json().get("url")
+
+                    if not video_url or not audio_url:
+                        st.error("Failed to retrieve uploaded file URLs.")
+                        return
+
+                    # Trigger lip-sync processing
+                    response = requests.post(
+                        "https://mango.sievedata.com/lipsync",
+                        headers=headers,
+                        json={"video_url": video_url, "audio_url": audio_url}
+                    )
+
+                    if response.status_code == 200:
+                        output_url = response.json().get("output_url")
+                        if output_url:
                             st.success("Lip-synced video generated successfully!")
                             st.video(output_url)
                         else:
-                            st.error(f"Failed to generate lip-synced video: {response.json()}")
-
+                            st.error("Lip-sync processing failed: No output URL provided.")
                     else:
-                        st.error("Failed to upload files to Sieve API.")
+                        st.error(f"Failed to generate lip-synced video: {response.text}")
 
                 except requests.exceptions.RequestException as e:
                     st.error(f"Network error: {e}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
+
 
