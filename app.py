@@ -4,8 +4,8 @@ import tempfile
 import os
 import subprocess
 import base64
-from gtts import gTTS
-import whisper
+import shutil
+import sieve
 
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
@@ -25,76 +25,79 @@ if uploaded_video is not None:
 
     # Step 2: Extract Audio and Transcribe
     audio_path = "extracted_audio.wav"
+    processed_audio_path = "processed_audio.wav"
     transcription_file_path = "transcription.txt"
 
     if st.button("Extract and Transcribe Audio"):
         with st.spinner('Processing audio...'):
             try:
+                # Extract audio using FFmpeg
                 subprocess.run(['ffmpeg', '-i', video_path, '-q:a', '0', '-map', 'a', audio_path], check=True)
+
+                # Convert extracted audio to desired format
+                subprocess.run(['ffmpeg', '-i', audio_path, '-ar', '16000', '-ac', '1', processed_audio_path], check=True)
+
+                # Transcribe audio using Whisper
                 model = whisper.load_model("base")
-                result = model.transcribe(audio_path)
+                result = model.transcribe(processed_audio_path)
+
+                # Save transcription to a file
                 transcription = result["text"]
                 with open(transcription_file_path, "w") as file:
                     file.write(transcription)
-                st.success("Audio extracted and transcribed successfully!")
+
+                st.success("Audio extracted, processed, and transcribed successfully!")
                 st.session_state["transcription"] = transcription
+
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Error during audio processing or transcription: {e}")
 
     # Step 3: Edit Transcript and Generate Edited Audio
     if "transcription" in st.session_state:
         transcription = st.session_state["transcription"]
-        edited_transcript = st.text_area("Edit the Transcript Here", transcription)
+        edited_transcript = st.text_area("Edit the Transcript Here", transcription, key="unique_edit_transcript")
 
         if st.button("Generate Edited Audio"):
             with st.spinner('Generating new audio...'):
                 try:
+                    # Generate audio from edited transcript using gTTS
                     tts = gTTS(text=edited_transcript, lang='en')
                     raw_audio_path = "raw_edited_audio.mp3"
                     tts.save(raw_audio_path)
+
+                    # Convert to WAV format
                     edited_audio_path = "edited_audio.wav"
-                    subprocess.run(['ffmpeg', '-i', raw_audio_path, '-ar', '16000', '-ac', '1', edited_audio_path], check=True)
+                    subprocess.run(['ffmpeg', '-y', '-i', raw_audio_path, '-ar', '16000', '-ac', '1', edited_audio_path], check=True)
+
                     st.success("Edited audio generated successfully!")
                     st.audio(edited_audio_path)
+
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Failed to generate or convert audio: {e}")
 
     # Step 4: Generate Lip-Synced Video
     if os.path.exists("edited_audio.wav") and os.path.exists(video_path):
         if st.button("Generate Lip-Synced Video"):
             with st.spinner('Generating lip-synced video...'):
                 try:
-                    SIEVE_API_KEY = "YOUR_API_KEY"
-                    headers = {"Authorization": f"Bearer {SIEVE_API_KEY}", "Content-Type": "application/json"}
-                    
-                    # Encode files as base64
-                    with open(video_path, "rb") as video_file:
-                        video_content = base64.b64encode(video_file.read()).decode('utf-8')
-                    with open("edited_audio.wav", "rb") as audio_file:
-                        audio_content = base64.b64encode(audio_file.read()).decode('utf-8')
+                    sieve.api_key = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"
 
-                    # Prepare payload
-                    payload = {
-                        "video": {"filename": os.path.basename(video_path), "content": video_content},
-                        "audio": {"filename": "edited_audio.wav", "content": audio_content}
-                    }
+                    # Upload video and audio to Sieve
+                    video_file = sieve.File(path=video_path)
+                    audio_file = sieve.File(path="edited_audio.wav")
 
-                    # Send request
-                    response = requests.post(
-                        "https://mango.sievedata.com/lipsync",
-                        headers=headers,
-                        json=payload
-                    )
+                    # Configure and run lip-sync function
+                    lipsync = sieve.function.get("sieve/lipsync")
+                    output = lipsync.run(video_file, audio_file, "default", "sievesync", False, "audio")
 
-                    if response.status_code == 200:
-                        output_url = response.json().get("output_url")
-                        if output_url:
-                            st.success("Lip-synced video generated successfully!")
-                            st.video(output_url)
-                        else:
-                            st.error("Lip-sync failed: No output URL provided.")
+                    # Verify output and display the result
+                    output_path = output.get("path")
+                    if output_path:
+                        shutil.copy(output_path, "lip_synced_output.mp4")
+                        st.success("Lip-synced video generated successfully!")
+                        st.video("lip_synced_output.mp4")
                     else:
-                        st.error(f"Error {response.status_code}: {response.text}")
+                        st.error("Lip-sync processing failed. No output file.")
 
                 except Exception as e:
-                    st.error(f"Error: {e}")
+                    st.error(f"Error during lip-syncing: {e}")
