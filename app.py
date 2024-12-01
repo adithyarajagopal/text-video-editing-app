@@ -91,14 +91,14 @@ if uploaded_video is not None:
                     # Upload files to Sieve
                     with open(video_path, "rb") as v_file:
                         video_upload = requests.post(
-                            "https://api.sieve.ai/upload",
+                            "https://mango.sievedata.com/upload",
                             headers=headers,
                             files={"file": v_file}
                         )
                     
                     with open("edited_audio.wav", "rb") as a_file:
                         audio_upload = requests.post(
-                            "https://api.sieve.ai/upload",
+                            "https://mango.sievedata.com/upload",
                             headers=headers,
                             files={"file": a_file}
                         )
@@ -109,7 +109,7 @@ if uploaded_video is not None:
 
                         # Trigger lip-sync processing
                         response = requests.post(
-                            "https://api.sieve.ai/lipsync",
+                            "https://mango.sievedata.com/lipsync",
                             headers=headers,
                             json={"video_url": video_url, "audio_url": audio_url}
                         )
@@ -124,5 +124,8 @@ if uploaded_video is not None:
                     else:
                         st.error("Failed to upload files to Sieve API.")
 
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Network error: {e}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
+
