@@ -113,6 +113,7 @@ if uploaded_video is not None:
                     st.info("Sending request to Sieve API...")
                     response = requests.post("https://mango.sievedata.com/lipsync", headers=headers, json=payload)
 
+                    # Improved error handling for API response
                     if response.status_code == 200:
                         output_url = response.json().get("output_url")
                         if output_url:
@@ -120,9 +121,15 @@ if uploaded_video is not None:
                             st.video(output_url)
                         else:
                             st.error("Lip-sync processing failed: No output URL provided.")
+                    elif response.status_code == 404:
+                        st.error("Error 404: Endpoint not found. Please verify the API URL.")
+                    elif response.status_code == 401:
+                        st.error("Error 401: Unauthorized. Verify your API key.")
+                    elif response.status_code == 400:
+                        st.error("Error 400: Bad Request. Check your payload format.")
+                    elif response.status_code == 500:
+                        st.error("Error 500: Internal Server Error. Try again later.")
                     else:
-                        st.error(f"Failed to generate lip-synced video: {response.text}")
-
+                        st.error(f"Unexpected error {response.status_code}: {response.text}")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
-
