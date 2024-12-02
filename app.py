@@ -111,9 +111,15 @@ if uploaded_video is not None:
                     }
 
                     st.info("Sending request to Sieve API...")
+                    st.info(f"API Endpoint: https://mango.sievedata.com/lipsync")  # Debug log
+                    st.info(f"Payload keys: {list(payload.keys())}")  # Debug payload structure
+
                     response = requests.post("https://mango.sievedata.com/lipsync", headers=headers, json=payload)
 
-                    # Improved error handling for API response
+                    # Debugging API response
+                    st.info(f"API Response Status Code: {response.status_code}")
+                    st.info(f"API Response Text: {response.text}")
+
                     if response.status_code == 200:
                         output_url = response.json().get("output_url")
                         if output_url:
