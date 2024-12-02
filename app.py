@@ -6,26 +6,7 @@ import subprocess
 from gtts import gTTS
 import whisper
 import base64
-
-# Function to read and encode a file as Base64
-def encode_file_to_base64(file_path):
-    try:
-        with open(file_path, "rb") as file:
-            return base64.b64encode(file.read()).decode('utf-8')
-    except Exception as e:
-        st.error(f"Error encoding file {file_path}: {e}")
-        return None
-
-# Function to test API endpoint
-def test_api_endpoint(url, headers, payload):
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        st.info(f"API Test - Status Code: {response.status_code}")
-        st.info(f"API Test - Response: {response.text}")
-        return response
-    except Exception as e:
-        st.error(f"Error testing API endpoint: {e}")
-        return None
+import sieve  # Import the sieve library
 
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
@@ -99,50 +80,35 @@ if uploaded_video is not None:
         if st.button("Generate Lip-Synced Video"):
             with st.spinner('Generating lip-synced video...'):
                 try:
-                    headers = {
-                        "Authorization": "Bearer cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw",
-                        "Content-Type": "application/json"
-                    }
+                    # Set your Sieve API key
+                    sieve.api_key = "cfYLVK8HOLOAS-riACFSa37EAdXFBlstd7CA_I3SYSw"  # Replace with your actual API key
 
-                    # Encode video and audio files as Base64
-                    st.info("Encoding video file as Base64...")
-                    video_base64 = encode_file_to_base64(video_path)
-                    if not video_base64:
-                        st.stop()
+                    # Provide paths to the video and audio files
+                    video_file = sieve.File(path=video_path)
+                    audio_file = sieve.File(path="edited_audio.wav")
 
-                    st.info("Encoding audio file as Base64...")
-                    audio_base64 = encode_file_to_base64("edited_audio.wav")
-                    if not audio_base64:
-                        st.stop()
+                    # Lip-sync job configuration
+                    enhance = "default"
+                    backend = "sievesync"
+                    downsample = False
+                    cut_by = "audio"
 
-                    # Prepare payload
-                    payload = {
-                        "video": {"filename": os.path.basename(video_path), "content": video_base64},
-                        "audio": {"filename": "edited_audio.wav", "content": audio_base64}
-                    }
+                    st.info("Processing lip-sync using Sieve API...")
 
-                    st.info("Testing API Endpoint...")
-                    test_api_endpoint("https://mango.sievedata.com/lipsync", headers, payload)
+                    # Get the lip-sync function
+                    lipsync = sieve.function.get("sieve/lipsync")
 
-                    st.info("Sending request to Sieve API...")
-                    response = requests.post("https://mango.sievedata.com/lipsync", headers=headers, json=payload)
+                    # Run the lip-sync function
+                    output = lipsync.run(video_file, audio_file, enhance, backend, downsample, cut_by)
 
-                    if response.status_code == 200:
-                        output_url = response.json().get("output_url")
-                        if output_url:
-                            st.success("Lip-synced video generated successfully!")
-                            st.video(output_url)
-                        else:
-                            st.error("Lip-sync processing failed: No output URL provided.")
-                    elif response.status_code == 404:
-                        st.error("Error 404: Endpoint not found. Please verify the API URL.")
-                    elif response.status_code == 401:
-                        st.error("Error 401: Unauthorized. Verify your API key.")
-                    elif response.status_code == 400:
-                        st.error("Error 400: Bad Request. Check your payload format.")
-                    elif response.status_code == 500:
-                        st.error("Error 500: Internal Server Error. Try again later.")
+                    # Get the output video URL
+                    output_url = output.get("path")
+
+                    if output_url:
+                        st.success("Lip-synced video generated successfully!")
+                        st.video(output_url)
                     else:
-                        st.error(f"Unexpected error {response.status_code}: {response.text}")
+                        st.error("Lip-sync processing failed: Output video URL not found.")
                 except Exception as e:
                     st.error(f"Error during lip-syncing: {e}")
+

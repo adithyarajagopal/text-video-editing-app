@@ -3,7 +3,8 @@ requests
 gTTS
 pyngrok
 git+https://github.com/openai/whisper.git
-sieve
+sievedata
 ffmpeg-python
+
 
 
