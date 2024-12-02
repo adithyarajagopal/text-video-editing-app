@@ -16,6 +16,17 @@ def encode_file_to_base64(file_path):
         st.error(f"Error encoding file {file_path}: {e}")
         return None
 
+# Function to test API endpoint
+def test_api_endpoint(url, headers, payload):
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        st.info(f"API Test - Status Code: {response.status_code}")
+        st.info(f"API Test - Response: {response.text}")
+        return response
+    except Exception as e:
+        st.error(f"Error testing API endpoint: {e}")
+        return None
+
 # Step 1: Title and Video Upload
 st.title("Text-Based Video Editing Tool")
 
@@ -110,15 +121,11 @@ if uploaded_video is not None:
                         "audio": {"filename": "edited_audio.wav", "content": audio_base64}
                     }
 
+                    st.info("Testing API Endpoint...")
+                    test_api_endpoint("https://mango.sievedata.com/lipsync", headers, payload)
+
                     st.info("Sending request to Sieve API...")
-                    st.info(f"API Endpoint: https://mango.sievedata.com/lipsync")  # Debug log
-                    st.info(f"Payload keys: {list(payload.keys())}")  # Debug payload structure
-
                     response = requests.post("https://mango.sievedata.com/lipsync", headers=headers, json=payload)
-
-                    # Debugging API response
-                    st.info(f"API Response Status Code: {response.status_code}")
-                    st.info(f"API Response Text: {response.text}")
 
                     if response.status_code == 200:
                         output_url = response.json().get("output_url")
